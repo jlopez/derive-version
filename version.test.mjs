@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  aliasTags,
   applyBump,
   bumpForCategory,
   classifyCommit,
@@ -34,6 +35,26 @@ describe('parseVersion / formatVersion', () => {
     assert.throws(() => parseVersion('1.2.3-rc.1'));
     assert.throws(() => parseVersion('1.2'));
     assert.throws(() => parseVersion('latest'));
+  });
+});
+
+describe('aliasTags', () => {
+  it('derives the vMAJOR and vMAJOR.MINOR floating pointers', () => {
+    assert.deepEqual(aliasTags('1.4.2'), ['v1', 'v1.4']);
+    assert.deepEqual(aliasTags('2.0.0'), ['v2', 'v2.0']);
+  });
+  it('handles multi-digit major/minor (no string slicing)', () => {
+    assert.deepEqual(aliasTags('12.34.5'), ['v12', 'v12.34']);
+  });
+  it('tolerates a leading v on the input', () => {
+    assert.deepEqual(aliasTags('v1.4.2'), ['v1', 'v1.4']);
+  });
+  it('honors a custom prefix', () => {
+    assert.deepEqual(aliasTags('1.4.2', 'ver'), ['ver1', 'ver1.4']);
+    assert.deepEqual(aliasTags('1.4.2', ''), ['1', '1.4']);
+  });
+  it('rejects a non-triple input (reuses parseVersion)', () => {
+    assert.throws(() => aliasTags('1.4'));
   });
 });
 
