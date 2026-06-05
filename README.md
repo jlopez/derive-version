@@ -89,3 +89,7 @@ tracks the latest `1.x`), or `@vMAJOR.MINOR` / an exact `@vX.Y.Z` for a stricter
 pin. The pure core is tested here with Node's built-in runner — `node --test
 version.test.mjs`, no dependencies — and the action [dogfoods itself](.github/workflows/ci.yml)
 to cut its own releases.
+
+## License
+
+[MIT](./LICENSE) © Jesus Lopez
