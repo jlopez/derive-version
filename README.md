@@ -1,4 +1,9 @@
-# `derive-version`
+# `jlopez/derive-version`
+
+[![CI](https://github.com/jlopez/derive-version/actions/workflows/ci.yml/badge.svg)](https://github.com/jlopez/derive-version/actions/workflows/ci.yml)
+[![Marketplace](https://img.shields.io/badge/Marketplace-Derive%20Semantic%20Version-purple?logo=github)](https://github.com/marketplace/actions/derive-semantic-version)
+[![Release](https://img.shields.io/github/v/release/jlopez/derive-version?sort=semver)](https://github.com/jlopez/derive-version/releases)
+[![License: MIT](https://img.shields.io/github/license/jlopez/derive-version)](./LICENSE)
 
 A self-contained composite action that derives **one repo-wide semantic version**
 from git tags + conventional commits. The version is **never stored in-tree** —
