@@ -1,8 +1,10 @@
-name: Derive version
-description: >
-  Derive a single repo-wide semantic version from git tags + conventional
-  commits — no version is stored in-tree. The latest tag is the floor; only
-  commits since it are considered. Optionally creates the tag + a GitHub Release.
+name: Derive Semantic Version
+description: >-
+  Repo-wide semantic version from git tags + conventional commits; no version
+  stored in-tree. Optionally tags + releases.
+branding:
+  icon: tag
+  color: purple
 
 # Self-contained and dependency-free: just Node (always present on GitHub
 # runners) + git + (for --create-release) the gh CLI. Designed to be lifted into
