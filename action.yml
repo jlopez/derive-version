@@ -1,0 +1,93 @@
+name: Derive version
+description: >
+  Derive a single repo-wide semantic version from git tags + conventional
+  commits — no version is stored in-tree. The latest tag is the floor; only
+  commits since it are considered. Optionally creates the tag + a GitHub Release.
+
+# Self-contained and dependency-free: just Node (always present on GitHub
+# runners) + git + (for --create-release) the gh CLI. Designed to be lifted into
+# its own repo verbatim — see README.md.
+
+inputs:
+  initial-version:
+    description: Baseline seeded as the first release when no tag exists yet.
+    default: '0.1.0'
+  tag-prefix:
+    description: Prefix identifying this scheme's tags (e.g. `v` → `v1.2.3`).
+    default: 'v'
+  create-release:
+    description: >
+      When 'true' and a release is warranted, push the tag and create a GitHub
+      Release. When 'false' (default), only compute outputs (dry run).
+    default: 'false'
+  github-token:
+    description: 'Token used to create the Release (needs `contents: write`).'
+    default: ${{ github.token }}
+
+outputs:
+  version:
+    description: The computed version, no prefix (e.g. `1.2.3`).
+    value: ${{ steps.derive.outputs.version }}
+  tag:
+    description: The computed tag, with prefix (e.g. `v1.2.3`).
+    value: ${{ steps.derive.outputs.tag }}
+  previous-tag:
+    description: The tag this was derived from, or '' on the first run.
+    value: ${{ steps.derive.outputs.previous-tag }}
+  bump:
+    description: major | minor | patch | none.
+    value: ${{ steps.derive.outputs.bump }}
+  released:
+    description: "'true' when a release is warranted (a tag/Release should exist)."
+    value: ${{ steps.derive.outputs.released }}
+  via-release-as:
+    description: "'true' when a `Release-As:` footer forced the version."
+    value: ${{ steps.derive.outputs.via-release-as }}
+  build-identity:
+    description: Always-available `git describe` identity (e.g. `v1.2.3-3-gabc1234`).
+    value: ${{ steps.derive.outputs.build-identity }}
+
+runs:
+  using: composite
+  steps:
+    # Bump computation reads the log back to the last tag, so the caller must
+    # check out with `fetch-depth: 0`. Tags can still be shallow/absent on some
+    # checkouts, so fetch them defensively (ignore failure for the first run).
+    - shell: bash
+      run: git fetch --tags --quiet || true
+
+    - id: derive
+      shell: bash
+      env:
+        INPUT_INITIAL_VERSION: ${{ inputs.initial-version }}
+        INPUT_TAG_PREFIX: ${{ inputs.tag-prefix }}
+      run: node "$GITHUB_ACTION_PATH/derive-version.mjs"
+
+    - name: Create tag + GitHub Release
+      if: inputs.create-release == 'true' && steps.derive.outputs.released == 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        TAG: ${{ steps.derive.outputs.tag }}
+        NOTES_FILE: ${{ steps.derive.outputs.notes-file }}
+      run: |
+        set -euo pipefail
+        # Idempotent on both the tag AND the Release, independently: a prior run
+        # (or a run cancelled by `cancel-in-progress` between the push and the
+        # release-create) may have left the tag without a Release. Push the tag
+        # only if the remote lacks it, then ensure the Release exists by trying to
+        # create it and tolerating "already exists" — re-running always converges
+        # on a tag that exists with a Release pointing at it.
+        if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+          echo "::notice::Tag $TAG already on the remote — ensuring its Release."
+        else
+          git tag "$TAG"
+          git push origin "$TAG"
+        fi
+        if gh release create "$TAG" --title "$TAG" --notes-file "$NOTES_FILE" 2>/dev/null; then
+          echo "::notice::Released $TAG"
+        elif gh release view "$TAG" >/dev/null 2>&1; then
+          echo "::notice::Release $TAG already exists — nothing to do."
+        else
+          echo "::error::Failed to create Release $TAG" && exit 1
+        fi

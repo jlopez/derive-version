@@ -1,0 +1,35 @@
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request: {}
+permissions:
+  contents: write   # version job pushes tag + Release on main
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: node --test version.test.mjs
+  version:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0, fetch-tags: true }
+      - id: ver
+        uses: ./                       # dogfood: version our own repo
+        with:
+          initial-version: '1.0.0'     # debut at 1.0.0 (stable contract)
+          create-release: ${{ github.ref == 'refs/heads/main' }}
+      - name: Move floating aliases (bootstrap; replaced in Phase 2)
+        if: github.ref == 'refs/heads/main' && steps.ver.outputs.released == 'true'
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          major="${VERSION%%.*}"; rest="${VERSION#*.}"; minor="${rest%.*}"
+          for alias in "v${major}" "v${major}.${minor}"; do
+            git tag -f "$alias"; git push -f origin "$alias"
+          done
