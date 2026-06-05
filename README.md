@@ -36,7 +36,15 @@ lifted into its own repo verbatim — see [Extraction](#extraction).
 | `initial-version` | `0.1.0`               | Baseline seeded as the first release when no tag exists.    |
 | `tag-prefix`      | `v`                   | Prefix identifying this scheme's tags.                      |
 | `create-release`  | `false`               | When `true` and a release is warranted, push tag + Release. |
+| `floating-tags`   | `false`               | When `true`, also advance floating `vMAJOR` / `vMAJOR.MINOR` tags. |
 | `github-token`    | `${{ github.token }}` | Token for creating the Release (`contents: write`).         |
+
+> **`floating-tags`** is for repos that **distribute a GitHub Action**, where the
+> convention is that consumers pin `@v1` and get the latest `1.x` (and `@v1.4` the
+> latest `1.4.x`). With it on, each release force-moves those aliases to the new
+> commit — gated by `create-release`, so PR dry-runs push nothing. Leave it off
+> (the default) when you ship Docker images / apps and don't want floating
+> pointers in your tag namespace.
 
 ## Outputs
 

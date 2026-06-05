@@ -23,13 +23,4 @@ jobs:
         with:
           initial-version: '1.0.0'     # debut at 1.0.0 (stable contract)
           create-release: ${{ github.ref == 'refs/heads/main' }}
-      - name: Move floating aliases (bootstrap; replaced in Phase 2)
-        if: github.ref == 'refs/heads/main' && steps.ver.outputs.released == 'true'
-        env:
-          VERSION: ${{ steps.ver.outputs.version }}
-        run: |
-          set -euo pipefail
-          major="${VERSION%%.*}"; rest="${VERSION#*.}"; minor="${rest%.*}"
-          for alias in "v${major}" "v${major}.${minor}"; do
-            git tag -f "$alias"; git push -f origin "$alias"
-          done
+          floating-tags: true          # we ship an action: maintain v1 / v1.1

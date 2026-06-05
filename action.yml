@@ -20,6 +20,13 @@ inputs:
       When 'true' and a release is warranted, push the tag and create a GitHub
       Release. When 'false' (default), only compute outputs (dry run).
     default: 'false'
+  floating-tags:
+    description: >
+      When 'true', also maintain floating `vMAJOR` / `vMAJOR.MINOR` tags that
+      advance to each release (so consumers can pin `@v1` for the latest `1.x`).
+      For repos distributing a GitHub Action; leave 'false' (default) otherwise.
+      Pushes only happen alongside `create-release`, so PR dry-runs move nothing.
+    default: 'false'
   github-token:
     description: 'Token used to create the Release (needs `contents: write`).'
     default: ${{ github.token }}
@@ -70,6 +77,8 @@ runs:
         GH_TOKEN: ${{ inputs.github-token }}
         TAG: ${{ steps.derive.outputs.tag }}
         NOTES_FILE: ${{ steps.derive.outputs.notes-file }}
+        FLOATING_TAGS: ${{ inputs.floating-tags }}
+        ALIAS_TAGS: ${{ steps.derive.outputs.alias-tags }}
       run: |
         set -euo pipefail
         # Idempotent on both the tag AND the Release, independently: a prior run
@@ -90,4 +99,28 @@ runs:
           echo "::notice::Release $TAG already exists — nothing to do."
         else
           echo "::error::Failed to create Release $TAG" && exit 1
+        fi
+        # Opt-in: advance the floating `vMAJOR` / `vMAJOR.MINOR` aliases to this
+        # release commit (HEAD). ALIAS_TAGS is the pre-computed `v1 v1.4` string
+        # from the derive step, so no version math happens in bash. Gated by the
+        # same release condition as the whole step, so PR dry-runs never push.
+        #
+        # Force-move only ever *advances* an alias: re-running an OLDER release
+        # workflow after a newer one already moved `v1` must not drag a
+        # consumer-facing pin backward onto stale code. So sync each alias to its
+        # current REMOTE position first (the start-of-run `git fetch --tags` is
+        # non-force and won't update an existing tag), then move it only when HEAD
+        # is at or ahead of that point. Three cases fall out: absent alias ->
+        # created; alias behind/at HEAD -> advanced; alias ahead of HEAD -> skipped.
+        if [ "$FLOATING_TAGS" = "true" ]; then
+          for alias in $ALIAS_TAGS; do
+            git fetch --force --quiet origin "refs/tags/$alias:refs/tags/$alias" 2>/dev/null || true
+            if git rev-parse -q --verify "refs/tags/$alias" >/dev/null \
+               && ! git merge-base --is-ancestor "$alias" HEAD; then
+              echo "::warning::Floating tag $alias is ahead of HEAD — not moving it backward."
+              continue
+            fi
+            git tag -f "$alias"
+            git push -f origin "$alias"
+          done
         fi

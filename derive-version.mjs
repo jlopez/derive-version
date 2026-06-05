@@ -13,7 +13,10 @@
 
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
+  aliasTags,
   compareVersions,
   decideNextVersion,
   parseVersion,
@@ -79,6 +82,16 @@ function main() {
   const initialVersion = (process.env.INPUT_INITIAL_VERSION || '0.1.0').trim();
   const prefix = (process.env.INPUT_TAG_PREFIX ?? 'v').trim();
 
+  // The prefix fans out into a regex, two git globs, the tag strings, and — when
+  // floating-tags is on — a space-joined value that action.yml word-splits in
+  // bash. Restrict it to tag-safe characters once here so no glob/shell
+  // metacharacter can reach any of those sinks, and so a malformed prefix fails
+  // loudly instead of silently widening the tag match (which would re-seed as if
+  // this were the first run).
+  if (!/^[\w./-]*$/.test(prefix)) {
+    throw new Error(`Invalid tag-prefix "${prefix}": only [A-Za-z0-9_./-] are allowed.`);
+  }
+
   const previousTag = latestVersionTag(prefix);
   const currentVersion = previousTag ? previousTag.slice(prefix.length) : null;
   // No backfill: only consider commits since the last tag. On the first run
@@ -95,12 +108,16 @@ function main() {
   // all-of-history here would list every past feat/fix under `0.1.0` even though
   // none drove that number (bump is `none`). Keep the seed's notes a placeholder.
   const notes = decision.seeded ? '_Initial release._' : renderReleaseNotes(commits);
-  const notesFile = `${process.env.RUNNER_TEMP || '.'}/derive-version-notes.md`;
+  const notesFile = join(process.env.RUNNER_TEMP || tmpdir(), 'derive-version-notes.md');
   writeFileSync(notesFile, notes);
 
   setOutput('version', decision.version);
   setOutput('previous-tag', decision.previous ? `${prefix}${decision.previous}` : '');
   setOutput('tag', tag);
+  // Space-joined floating aliases (e.g. `v1 v1.4`) so action.yml's release step
+  // can `for alias in $ALIAS_TAGS` without building any version strings in bash.
+  // Only pushed when the opt-in `floating-tags` input is on; computed always.
+  setOutput('alias-tags', aliasTags(decision.version, prefix).join(' '));
   setOutput('bump', decision.bump);
   setOutput('released', String(decision.released));
   setOutput('via-release-as', String(decision.viaReleaseAs));

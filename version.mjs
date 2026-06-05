@@ -42,6 +42,20 @@ export function formatVersion(v) {
 }
 
 /**
+ * The floating-alias tags for a version: the `MAJOR` and `MAJOR.MINOR` pointers
+ * that action-distributing consumers pin so `@v1` tracks the latest `1.x` and
+ * `@v1.4` the latest `1.4.x`. `'1.4.2'` ⇒ `['v1', 'v1.4']`. Opt-in (the
+ * `floating-tags` input) — only the canonical `vX.Y.Z` tag is cut otherwise.
+ * @param {string} version  A MAJOR.MINOR.PATCH version (no prefix; leading `v` tolerated).
+ * @param {string} [prefix='v']  Tag prefix.
+ * @returns {string[]}  Two tags, `[<prefix>MAJOR, <prefix>MAJOR.MINOR]`.
+ */
+export function aliasTags(version, prefix = 'v') {
+  const { major, minor } = parseVersion(version);
+  return [`${prefix}${major}`, `${prefix}${major}.${minor}`];
+}
+
+/**
  * Compare two version records. Returns <0 if a<b, 0 if equal, >0 if a>b.
  */
 export function compareVersions(a, b) {
